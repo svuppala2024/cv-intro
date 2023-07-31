@@ -1,5 +1,6 @@
 import argparse
-
+import lane_detection
+import matplotlib.pyplot as plt
 import cv2
 
 
@@ -14,9 +15,14 @@ def main(ip_address):
             # Check frame was received successfully
             if ret:
                 print(" YOU GOT THIS ")
-                print(frame.shape)
                 # TODO: Do something with the frame here
-
+                frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+                lines = lane_detection.detect_lines(frame, 35, 60, 3, 200, 20)
+                lines = lane_detection.rmvExcessLines(lines)
+                lanes = lane_detection.detect_lanes(lines)
+                img = lane_detection.draw_lanes(frame, lanes)
+                plt.imshow(img)
+                plt.show()
             else:
                 pass
 

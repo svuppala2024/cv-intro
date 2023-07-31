@@ -22,16 +22,22 @@ def recommend_direction(center, slope):
     rotational = ''
     if center < 1900:
         translational = 'stafe right'
+        powerTranslational = [100, -100, 100, -100, 0, 0]
     elif center > 1940:
         translational = 'strafe left'
+        powerTranslational = [-100, 100, -100, 100, 0, 0]
     else:
         translational = 'forward'
-    if abs(slope) > 30:
+        powerTranslational = [100, 100, -100, -100, 0, 0]
+    if abs(slope) > 10:
         rotational = 'don\'t turn'
+        powerRotational = [0, 0, 0, 0, 0, 0]
     elif slope >= 0:
         rotational = 'turn right'
+        powerRotational = [100, -100, -100, 100, 0, 0]
     else:
         rotational = 'turn left'
-
-    return translational + ' and ' + rotational
+        powerRotational = [-100, 100, 100, -100, 0, 0]
+    thrusterPower = np.divide(np.add(np.array(powerTranslational), np.array(powerRotational)), 2)
+    return translational + ' and ' + rotational, thrusterPower 
 

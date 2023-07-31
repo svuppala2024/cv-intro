@@ -4,8 +4,10 @@ import numpy as np
 import random
 
 def detect_lines(img, threshold1 = 50, threshold2 = 150, apertureSize = 3, minLineLength = 100, maxLineGap = 10):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # convert to grayscale
-    edges = cv2.Canny(gray, threshold1, threshold2, apertureSize=apertureSize) # detect edges
+    blur = cv2.GaussianBlur(img,(5,5),0)
+    gray = cv2.cvtColor(blur, cv2.COLOR_BGR2GRAY) # convert to grayscale
+    thresh, bw = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY)
+    edges = cv2.Canny(bw, threshold1, threshold2, apertureSize=apertureSize) # detect edges
     lines = cv2.HoughLinesP(
                     edges,
                     1,
@@ -14,13 +16,12 @@ def detect_lines(img, threshold1 = 50, threshold2 = 150, apertureSize = 3, minLi
                     minLineLength=minLineLength,
                     maxLineGap=maxLineGap,
             ) # detect lines
-
     return lines
 
 def draw_lines(img, lines, color):
     for line in lines:
         x1, y1, x2, y2 = line[0]
-        cv2.line(img, (x1, y1), (x2, y2), (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), 10)
+        cv2.line(img, (x1, y1), (x2, y2), color, 10)
 
     return img
 
@@ -43,18 +44,20 @@ def detect_lanes(lines):
     lanes = []
     while i < len(lines) - 1:
         dists = {}
-        for j in range(1, len(lines) - i):
-            dists[j + i] = abs(xInts[i] - xInts[j])
+        for j in range(i + 1, len(lines)):
+            dists[j] = abs(xInts[i] - xInts[j])
         temp = min(dists.values())
-        res = [key for key in dists if dists[key] == temp][0]
-        lanes.append([lines[i], lines[res]])
-        np.delete(lines, res)
-        np.delete(lines, i)
-        slopes.pop(res)
-        slopes.pop(i)
-        xInts.pop(res)
-        xInts.pop(i)
-        print('pass')
+        try:
+            res = [key for key in dists if dists[key] == temp][0]
+            lanes.append([lines[i], lines[res]])
+            lines = np.delete(lines, res, axis = 0)
+            lines = np.delete(lines, i, axis = 0)
+            slopes.pop(res)
+            slopes.pop(i)
+            xInts.pop(res)
+            xInts.pop(i)
+        except IndexError:
+            pass
         i += 1
     return lanes
 
@@ -79,7 +82,7 @@ def rmvExcessLines(lines):
         
         for j in range(1, len(slopes)):
             ratio = (slopes[j-1]/slope, (y_intercepts[j-1]/y_intercept))
-            if ratio[0] > 0.95 and ratio[1] > 0.95:
+            if ratio[0] > 0.99 and ratio[1] > 0.99:
                 slopes.remove(slope)
                 closeto = True
                 break
@@ -92,13 +95,11 @@ def rmvExcessLines(lines):
 
 def draw_lanes(img, lanes):
     for lane in lanes:
-        print(lane)
         r = random.randint(0, 255)
         g = random.randint(0, 255)
         b = random.randint(0, 255)
         for line in lane:
             x1, y1, x2, y2 = line[0]
-            print((r, g, b))
             cv2.line(img, (x1, y1), (x2, y2), (r, g, b), 15)
     return img
         
