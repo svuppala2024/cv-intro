@@ -4,15 +4,15 @@ import numpy as np
 import random
 
 def detect_lines(img, threshold1 = 50, threshold2 = 150, apertureSize = 3, minLineLength = 100, maxLineGap = 10):
-    blur = cv2.GaussianBlur(img,(5,5),0)
-    gray = cv2.cvtColor(blur, cv2.COLOR_BGR2GRAY) # convert to grayscale
-    thresh, bw = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY)
-    edges = cv2.Canny(bw, threshold1, threshold2, apertureSize=apertureSize) # detect edges
+    # blur = cv2.GaussianBlur(img,(5,5),0)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # convert to grayscale
+    # thresh, bw = cv2.threshold(gray, 145, 160, cv2.THRESH_BINARY)
+    edges = cv2.Canny(gray, threshold1, threshold2, apertureSize=apertureSize) # detect edges
     lines = cv2.HoughLinesP(
                     edges,
                     1,
-                    np.pi/360,
-                    120,
+                    np.pi/180,
+                    100,
                     minLineLength=minLineLength,
                     maxLineGap=maxLineGap,
             ) # detect lines
@@ -39,26 +39,43 @@ def get_slopes_intercepts(lines):
     return slopes, xInts
 
 def detect_lanes(lines):
-    slopes, xInts = get_slopes_intercepts(lines)
-    i = 0
+    res = 2160
+    slopes, intercepts = get_slopes_intercepts(lines)
+
     lanes = []
-    while i < len(lines) - 1:
-        dists = {}
-        for j in range(i + 1, len(lines)):
-            dists[j] = abs(xInts[i] - xInts[j])
-        temp = min(dists.values())
-        try:
-            res = [key for key in dists if dists[key] == temp][0]
-            lanes.append([lines[i], lines[res]])
-            lines = np.delete(lines, res, axis = 0)
-            lines = np.delete(lines, i, axis = 0)
-            slopes.pop(res)
-            slopes.pop(i)
-            xInts.pop(res)
-            xInts.pop(i)
-        except IndexError:
-            pass
-        i += 1
+    for i in range(len(slopes)):
+        for j in range(i + 1, len(slopes)):
+            min_intercept = min(intercepts[i], intercepts[j])
+            max_intercept = max(intercepts[i], intercepts[j])
+            min_slope = min(slopes[i], slopes[j])
+            max_slope = max(slopes[i], slopes[j])
+            intercept_ratio = abs(min_intercept / max_intercept)
+            slope_ratio = abs(min_slope / max_slope)
+            slope_difference = abs(1 / slopes[i] - 1 / slopes[j])
+
+            # print(f"dist1:{abs(intercepts[i]-intercepts[j])}")
+            # print(f"slope1:{abs(1/ slopes[i]-1 /slopes[j])}")
+            # print(f"dist2:{max_intercept - min_intercept }")
+            # print(f"slope2:{slope_difference}")
+
+            if (
+                max_intercept - min_intercept > 100
+                and max_intercept - min_intercept < 10000
+                and slope_difference < 1
+            ):
+                # m1(x-x1) = m2(x - x2)
+                # m1x - m1x1 = m2x - m2x2
+                # m1x - m2x = m1x1 - m2x2
+                # x = (m1x1 - m2x2) / (m1-m2)
+                x = (slopes[i] * intercepts[i] - slopes[j] * intercepts[j]) / (
+                    slopes[i] - slopes[j]
+                )
+                # plug in x into any equation, add resolution to account for cam
+                y = slopes[i] * (x - intercepts[i]) + res
+
+                line1 = [intercepts[i], res, x, y]
+                line2 = [intercepts[j], res, x, y]
+                lanes.append([line1, line2])
     return lanes
 
 def rmvExcessLines(lines):
@@ -82,7 +99,7 @@ def rmvExcessLines(lines):
         
         for j in range(1, len(slopes)):
             ratio = (slopes[j-1]/slope, (y_intercepts[j-1]/y_intercept))
-            if ratio[0] > 0.99 and ratio[1] > 0.99:
+            if ratio[0] > 0.95 and ratio[1] > 0.95:
                 slopes.remove(slope)
                 closeto = True
                 break
